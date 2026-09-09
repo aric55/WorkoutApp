@@ -25,7 +25,7 @@
       --bg: #121212;
       --card: #1e1e1e;
       --border: #2d2d2d;
-      --accent: #4ade80; /* Mint Green */
+      --accent: #4ade80;
       --accent-dim: rgba(74, 222, 128, 0.15);
       --danger: #ef4444;
       --text: #f3f4f6;
@@ -60,7 +60,7 @@
       flex: 1;
       overflow-y: auto;
       padding: 1rem;
-      padding-bottom: 5rem;
+      padding-bottom: 5.5rem;
     }
 
     /* Views */
@@ -98,7 +98,7 @@
       font-weight: 600;
       margin-bottom: 0.25rem;
     }
-    input[type="number"], input[type="text"] {
+    input[type="number"], input[type="text"], input[type="url"] {
       background: #262626;
       border: 1px solid var(--border);
       border-radius: 6px;
@@ -109,6 +109,7 @@
       width: 100%;
     }
     input:focus { outline: none; border-color: var(--accent); }
+    .input-left { text-align: left !important; }
 
     /* Buttons */
     button {
@@ -187,16 +188,26 @@
     }
     .nav-btn.active { color: var(--accent); }
 
-    /* History List */
-    .history-card {
+    /* History & Card Elements */
+    .history-card, .settings-card {
       background: var(--card);
       border-radius: var(--radius);
       padding: 1rem;
       margin-bottom: 0.75rem;
       border-left: 4px solid var(--accent);
     }
-    .history-card h3 { font-size: 1rem; margin-bottom: 0.35rem; }
+    .history-card h3, .settings-card h3 { font-size: 1rem; margin-bottom: 0.35rem; }
     .history-meta { font-size: 0.8rem; color: var(--text-dim); margin-bottom: 0.5rem; }
+
+    .sync-badge {
+      display: inline-block;
+      font-size: 0.7rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-left: 6px;
+    }
+    .sync-badge.synced { background: rgba(74, 222, 128, 0.2); color: var(--accent); }
+    .sync-badge.pending { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
   </style>
 </head>
 <body>
@@ -209,7 +220,7 @@
 
   <header>
     <h1>IronLog</h1>
-    <span class="status" id="db-status">Local Mode (Ready for Sheet sync)</span>
+    <span class="status" id="db-status">Checking...</span>
   </header>
 
   <main>
@@ -233,6 +244,28 @@
       </div>
       <div id="history-container"></div>
     </div>
+
+    <!-- SETTINGS VIEW -->
+    <div id="settings-view" class="view">
+      <h2 style="margin-bottom: 1rem;">Settings</h2>
+      
+      <div class="settings-card" style="border-left-color: #3b82f6;">
+        <h3>Google Sheets Sync (Option B)</h3>
+        <p style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 0.75rem;">
+          Paste your deployed Google Apps Script Web App URL below. It stays stored strictly on this device.
+        </p>
+        <input type="url" id="sheet-url-input" class="input-left" placeholder="https://script.google.com/macros/s/.../exec" style="margin-bottom: 0.75rem;" />
+        <button class="btn-full" onclick="saveSettings()">Save Webhook URL</button>
+      </div>
+
+      <div class="settings-card" style="border-left-color: var(--accent);">
+        <h3>Manual Sync</h3>
+        <p style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 0.75rem;">
+          If you worked out offline or recently added your URL, push all local workouts to Google Sheets now.
+        </p>
+        <button class="btn-full btn-secondary" onclick="syncAllUnsynced()">Sync Unsynced Workouts</button>
+      </div>
+    </div>
   </main>
 
   <nav>
@@ -242,6 +275,9 @@
     <button class="nav-btn" id="nav-history" onclick="switchTab('history')">
       <span>📜</span>History
     </button>
+    <button class="nav-btn" id="nav-settings" onclick="switchTab('settings')">
+      <span>⚙️</span>Settings
+    </button>
   </nav>
 
   <script>
@@ -250,13 +286,28 @@
     let timerInterval = null;
     let secondsRemaining = 0;
 
-    // Load data from localStorage
     function getHistory() {
       return JSON.parse(localStorage.getItem('workout_history') || '[]');
     }
 
     function saveHistory(history) {
       localStorage.setItem('workout_history', JSON.stringify(history));
+    }
+
+    function getSheetUrl() {
+      return localStorage.getItem('google_sheet_url') || '';
+    }
+
+    function updateStatusIndicator() {
+      const url = getSheetUrl();
+      const statusEl = document.getElementById('db-status');
+      if (url) {
+        statusEl.innerText = 'Sheets Connected 🟢';
+        statusEl.style.color = 'var(--accent)';
+      } else {
+        statusEl.innerText = 'Local Only ⚪';
+        statusEl.style.color = 'var(--text-dim)';
+      }
     }
 
     // UI Tab Navigation
@@ -267,14 +318,26 @@
       if (tab === 'workout') {
         document.getElementById('workout-view').classList.add('active');
         document.getElementById('nav-workout').classList.add('active');
-      } else {
+      } else if (tab === 'history') {
         document.getElementById('history-view').classList.add('active');
         document.getElementById('nav-history').classList.add('active');
         renderHistory();
+      } else if (tab === 'settings') {
+        document.getElementById('settings-view').classList.add('active');
+        document.getElementById('nav-settings').classList.add('active');
+        document.getElementById('sheet-url-input').value = getSheetUrl();
       }
     }
 
-    // Add Exercise
+    // Save Settings
+    function saveSettings() {
+      const url = document.getElementById('sheet-url-input').value.trim();
+      localStorage.setItem('google_sheet_url', url);
+      updateStatusIndicator();
+      alert('Settings saved!');
+    }
+
+    // Workout builder
     function addExercise() {
       const input = document.getElementById('new-exercise-input');
       const name = input.value.trim();
@@ -320,7 +383,7 @@
       renderWorkout();
 
       if (set.completed) {
-        startTimer(90); // 90-second default rest
+        startTimer(90);
         if (navigator.vibrate) navigator.vibrate(100);
       }
     }
@@ -354,7 +417,6 @@
       document.getElementById('timer-display').innerText = `${m}:${s}`;
     }
 
-    // Render Workout Interface
     function renderWorkout() {
       const container = document.getElementById('exercises-container');
       container.innerHTML = '';
@@ -401,25 +463,78 @@
       });
     }
 
+    // Google Sheets Sync Bridge
+    async function sendToSheet(entry) {
+      const url = getSheetUrl();
+      if (!url) return false;
+
+      try {
+        // Apps Script requires text/plain to bypass CORS preflight checks
+        await fetch(url, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify(entry)
+        });
+        return true;
+      } catch (e) {
+        console.error('Failed to push to Google Sheet', e);
+        return false;
+      }
+    }
+
     // Finish and Log Workout
-    function finishWorkout() {
+    async function finishWorkout() {
       if (currentWorkout.length === 0) return alert('No exercises to log!');
 
       const history = getHistory();
       const entry = {
+        id: Date.now(),
         date: new Date().toISOString(),
-        exercises: currentWorkout
+        exercises: currentWorkout,
+        synced: false
       };
 
+      // Save locally first
       history.unshift(entry);
       saveHistory(history);
 
-      // (Hook for Option B: Google Sheets sync will go right here)
+      // Attempt background sync to Google Sheet
+      const sheetUrl = getSheetUrl();
+      if (sheetUrl) {
+        const success = await sendToSheet(entry);
+        if (success) {
+          entry.synced = true;
+          saveHistory(history);
+        }
+      }
 
       currentWorkout = [];
       renderWorkout();
-      alert('Workout saved!');
       switchTab('history');
+    }
+
+    // Bulk sync for un-synced workouts
+    async function syncAllUnsynced() {
+      const url = getSheetUrl();
+      if (!url) return alert('Please enter and save a Webhook URL first!');
+
+      const history = getHistory();
+      let syncCount = 0;
+
+      for (let item of history) {
+        if (!item.synced) {
+          const success = await sendToSheet(item);
+          if (success) {
+            item.synced = true;
+            syncCount++;
+          }
+        }
+      }
+
+      saveHistory(history);
+      renderHistory();
+      alert(`Sync finished! Pushed ${syncCount} workout(s) to your Sheet.`);
     }
 
     // Render History
@@ -447,8 +562,15 @@
           return `<li><strong>${ex.name}</strong>: ${totalSets} sets (Top: ${bestSet.weight || 0} × ${bestSet.reps || 0})</li>`;
         }).join('');
 
+        const syncBadge = item.synced 
+          ? '<span class="sync-badge synced">Synced</span>' 
+          : '<span class="sync-badge pending">Local Only</span>';
+
         card.innerHTML = `
-          <h3>Workout</h3>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h3>Workout</h3>
+            ${syncBadge}
+          </div>
           <div class="history-meta">${dateStr}</div>
           <ul style="padding-left:1.2rem; font-size:0.9rem; line-height:1.4;">${details}</ul>
         `;
@@ -465,6 +587,9 @@
       a.download = `ironlog-backup-${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
     }
+
+    // Initialize UI on load
+    updateStatusIndicator();
   </script>
 </body>
 </html>
