@@ -38,8 +38,22 @@
   <main>
     <!-- WORKOUT VIEW -->
     <div id="workout-view" class="view active">
+      <!-- Routine Template Selector -->
+      <div style="background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem; margin-bottom: 1rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+          <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-dim);">LOAD TEMPLATE</span>
+          <button class="btn-small btn-secondary" onclick="resetWorkout()">Clear</button>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem;">
+          <button class="btn-small btn-secondary" onclick="loadTemplate('dayA')">Day A</button>
+          <button class="btn-small btn-secondary" onclick="loadTemplate('dayB')">Day B</button>
+          <button class="btn-small btn-secondary" onclick="loadTemplate('dayC')">Day C</button>
+        </div>
+      </div>
+
+      <!-- Add Exercise Bar -->
       <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
-        <input type="text" id="new-exercise-input" placeholder="Exercise name (e.g. Bench Press)" />
+        <input type="text" id="new-exercise-input" placeholder="Custom exercise..." />
         <button class="btn-small" onclick="addExercise()">+ Add</button>
       </div>
 

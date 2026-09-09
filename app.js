@@ -3,6 +3,72 @@ let currentWorkout = [];
 let timerInterval = null;
 let secondsRemaining = 0;
 
+// 3-Day 60-Minute Workout Templates (30m Walk + 30m Free Weights)
+const TEMPLATES = {
+  dayA: [
+    { name: "Treadmill Walk", type: "distance", sets: [{ distance: "1.5", duration: "30:00", completed: false }] },
+    { name: "Goblet / Barbell Squat", type: "weight", sets: [{ weight: "", reps: "8", completed: false }, { weight: "", reps: "8", completed: false }, { weight: "", reps: "8", completed: false }] },
+    { name: "Dumbbell Bench Press", type: "weight", sets: [{ weight: "", reps: "10", completed: false }, { weight: "", reps: "10", completed: false }, { weight: "", reps: "10", completed: false }] },
+    { name: "Dumbbell Romanian Deadlift", type: "weight", sets: [{ weight: "", reps: "10", completed: false }, { weight: "", reps: "10", completed: false }, { weight: "", reps: "10", completed: false }] },
+    { name: "Plank", type: "time", sets: [{ duration: "45s", completed: false }, { duration: "45s", completed: false }] }
+  ],
+  dayB: [
+    { name: "Treadmill Walk", type: "distance", sets: [{ distance: "1.5", duration: "30:00", completed: false }] },
+    { name: "Deadlift (Barbell or DB)", type: "weight", sets: [{ weight: "", reps: "6", completed: false }, { weight: "", reps: "6", completed: false }, { weight: "", reps: "6", completed: false }] },
+    { name: "Dumbbell Overhead Press", type: "weight", sets: [{ weight: "", reps: "8", completed: false }, { weight: "", reps: "8", completed: false }, { weight: "", reps: "8", completed: false }] },
+    { name: "Dumbbell Bent-Over Row", type: "weight", sets: [{ weight: "", reps: "10", completed: false }, { weight: "", reps: "10", completed: false }, { weight: "", reps: "10", completed: false }] },
+    { name: "Hanging Knee Raise", type: "weight", sets: [{ weight: "0", reps: "12", completed: false }, { weight: "0", reps: "12", completed: false }] }
+  ],
+  dayC: [
+    { name: "Treadmill Walk", type: "distance", sets: [{ distance: "1.5", duration: "30:00", completed: false }] },
+    { name: "Dumbbell Walking Lunges", type: "weight", sets: [{ weight: "", reps: "10", completed: false }, { weight: "", reps: "10", completed: false }, { weight: "", reps: "10", completed: false }] },
+    { name: "Dumbbell Incline Bench Press", type: "weight", sets: [{ weight: "", reps: "10", completed: false }, { weight: "", reps: "10", completed: false }, { weight: "", reps: "10", completed: false }] },
+    { name: "Lat Pulldown (or DB Pullover)", type: "weight", sets: [{ weight: "", reps: "10", completed: false }, { weight: "", reps: "10", completed: false }, { weight: "", reps: "10", completed: false }] },
+    { name: "Side Plank", type: "time", sets: [{ duration: "30s", completed: false }, { duration: "30s", completed: false }] }
+  ]
+};
+
+// Find the last logged performance for a given exercise and set index
+function getLastSessionSet(exerciseName, setIndex) {
+  const history = typeof getHistory === 'function' ? getHistory() : [];
+  const cleanName = exerciseName.trim().toLowerCase();
+
+  for (const session of history) {
+    const matchedEx = session.exercises.find(
+      e => e.name.trim().toLowerCase() === cleanName
+    );
+    if (matchedEx && matchedEx.sets && matchedEx.sets.length > 0) {
+      return matchedEx.sets[setIndex] || matchedEx.sets[matchedEx.sets.length - 1];
+    }
+  }
+  return null;
+}
+
+// Load a template into the active session
+function loadTemplate(templateKey) {
+  if (currentWorkout.length > 0) {
+    const overwrite = confirm("Replace your current exercises with this template?");
+    if (!overwrite) return;
+  }
+  
+  const template = TEMPLATES[templateKey];
+  currentWorkout = JSON.parse(JSON.stringify(template)).map(ex => ({
+    ...ex,
+    id: Date.now() + Math.random()
+  }));
+
+  renderWorkout();
+}
+
+// Clear current session
+function resetWorkout() {
+  if (currentWorkout.length === 0) return;
+  if (confirm("Clear current exercises?")) {
+    currentWorkout = [];
+    renderWorkout();
+  }
+}
+
 // UI Tab Navigation
 function switchTab(tab) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
@@ -18,7 +84,10 @@ function switchTab(tab) {
   } else if (tab === 'settings') {
     document.getElementById('settings-view').classList.add('active');
     document.getElementById('nav-settings').classList.add('active');
-    document.getElementById('sheet-url-input').value = getSheetUrl();
+    const sheetInput = document.getElementById('sheet-url-input');
+    if (sheetInput && typeof getSheetUrl === 'function') {
+      sheetInput.value = getSheetUrl();
+    }
   }
 }
 
@@ -28,7 +97,6 @@ function addExercise() {
   const name = input.value.trim();
   if (!name) return;
 
-  // Exercise types: 'weight' (default), 'time' (planks), 'distance' (cardio)
   currentWorkout.push({
     id: Date.now(),
     name: name,
@@ -127,7 +195,6 @@ function renderWorkout() {
     card.className = 'exercise-card';
     const type = exercise.type || 'weight';
 
-    // Build headers based on exercise type
     let colHeaders = '';
     let gridStyle = '';
 
@@ -144,7 +211,7 @@ function renderWorkout() {
       gridStyle = 'grid-template-columns: 35px 2fr 45px 35px;';
       colHeaders = `
         <div>Set</div>
-        <div>Time (sec/min)</div>
+        <div>Time</div>
         <div style="text-align:center">Done</div>
         <div></div>
       `;
@@ -162,24 +229,34 @@ function renderWorkout() {
     let setsHTML = `<div class="set-row set-header" style="${gridStyle}">${colHeaders}</div>`;
 
     exercise.sets.forEach((set, setIdx) => {
+      const last = getLastSessionSet(exercise.name, setIdx);
       let inputsHTML = '';
+
       if (type === 'weight') {
+        const weightPlaceholder = (last && last.weight) ? last.weight : '0';
+        const repsPlaceholder = (last && last.reps) ? last.reps : '0';
+
         inputsHTML = `
-          <input type="number" value="${set.weight || ''}" placeholder="0" 
+          <input type="number" value="${set.weight || ''}" placeholder="${weightPlaceholder}" 
             oninput="updateSet(${exIdx}, ${setIdx}, 'weight', this.value)" />
-          <input type="number" value="${set.reps || ''}" placeholder="0" 
+          <input type="number" value="${set.reps || ''}" placeholder="${repsPlaceholder}" 
             oninput="updateSet(${exIdx}, ${setIdx}, 'reps', this.value)" />
         `;
       } else if (type === 'time') {
+        const timePlaceholder = (last && last.duration) ? last.duration : 'e.g. 45s';
+
         inputsHTML = `
-          <input type="text" value="${set.duration || ''}" placeholder="e.g. 60s or 1:30" 
+          <input type="text" value="${set.duration || ''}" placeholder="${timePlaceholder}" 
             oninput="updateSet(${exIdx}, ${setIdx}, 'duration', this.value)" />
         `;
       } else if (type === 'distance') {
+        const distPlaceholder = (last && last.distance) ? last.distance : 'mi / km';
+        const timePlaceholder = (last && last.duration) ? last.duration : '30:00';
+
         inputsHTML = `
-          <input type="text" value="${set.distance || ''}" placeholder="mi / km" 
+          <input type="text" value="${set.distance || ''}" placeholder="${distPlaceholder}" 
             oninput="updateSet(${exIdx}, ${setIdx}, 'distance', this.value)" />
-          <input type="text" value="${set.duration || ''}" placeholder="min / sec" 
+          <input type="text" value="${set.duration || ''}" placeholder="${timePlaceholder}" 
             oninput="updateSet(${exIdx}, ${setIdx}, 'duration', this.value)" />
         `;
       }
@@ -231,8 +308,8 @@ async function finishWorkout() {
   history.unshift(entry);
   saveHistory(history);
 
-  const sheetUrl = getSheetUrl();
-  if (sheetUrl) {
+  const sheetUrl = typeof getSheetUrl === 'function' ? getSheetUrl() : '';
+  if (sheetUrl && typeof sendToSheet === 'function') {
     const success = await sendToSheet(entry);
     if (success) {
       entry.synced = true;
@@ -248,7 +325,7 @@ async function finishWorkout() {
 // Render History
 function renderHistory() {
   const container = document.getElementById('history-container');
-  const history = getHistory();
+  const history = typeof getHistory === 'function' ? getHistory() : [];
   container.innerHTML = '';
 
   if (history.length === 0) {
@@ -302,4 +379,6 @@ function renderHistory() {
 }
 
 // Initialize on load
-updateStatusIndicator();
+if (typeof updateStatusIndicator === 'function') {
+  updateStatusIndicator();
+}
