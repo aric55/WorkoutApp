@@ -28,13 +28,31 @@ function addExercise() {
   const name = input.value.trim();
   if (!name) return;
 
+  // Exercise types: 'weight' (default), 'time' (planks), 'distance' (cardio)
   currentWorkout.push({
     id: Date.now(),
     name: name,
-    sets: [{ weight: '', reps: '', completed: false }]
+    type: 'weight',
+    sets: [createEmptySet('weight')]
   });
 
   input.value = '';
+  renderWorkout();
+}
+
+function createEmptySet(type, previousSet = {}) {
+  if (type === 'time') {
+    return { duration: previousSet.duration || '', completed: false };
+  } else if (type === 'distance') {
+    return { distance: previousSet.distance || '', duration: previousSet.duration || '', completed: false };
+  } else {
+    return { weight: previousSet.weight || '', reps: previousSet.reps || '', completed: false };
+  }
+}
+
+function changeExerciseType(index, newType) {
+  currentWorkout[index].type = newType;
+  currentWorkout[index].sets = [createEmptySet(newType)];
   renderWorkout();
 }
 
@@ -44,12 +62,9 @@ function removeExercise(index) {
 }
 
 function addSet(exerciseIndex) {
-  const lastSet = currentWorkout[exerciseIndex].sets.slice(-1)[0] || { weight: '', reps: '' };
-  currentWorkout[exerciseIndex].sets.push({
-    weight: lastSet.weight,
-    reps: lastSet.reps,
-    completed: false
-  });
+  const ex = currentWorkout[exerciseIndex];
+  const lastSet = ex.sets.slice(-1)[0] || {};
+  ex.sets.push(createEmptySet(ex.type, lastSet));
   renderWorkout();
 }
 
@@ -110,25 +125,69 @@ function renderWorkout() {
   currentWorkout.forEach((exercise, exIdx) => {
     const card = document.createElement('div');
     card.className = 'exercise-card';
+    const type = exercise.type || 'weight';
 
-    let setsHTML = `
-      <div class="set-row set-header">
+    // Build headers based on exercise type
+    let colHeaders = '';
+    let gridStyle = '';
+
+    if (type === 'weight') {
+      gridStyle = 'grid-template-columns: 35px 1fr 1fr 45px 35px;';
+      colHeaders = `
         <div>Set</div>
         <div>Lbs / Kg</div>
         <div>Reps</div>
         <div style="text-align:center">Done</div>
         <div></div>
-      </div>
-    `;
+      `;
+    } else if (type === 'time') {
+      gridStyle = 'grid-template-columns: 35px 2fr 45px 35px;';
+      colHeaders = `
+        <div>Set</div>
+        <div>Time (sec/min)</div>
+        <div style="text-align:center">Done</div>
+        <div></div>
+      `;
+    } else if (type === 'distance') {
+      gridStyle = 'grid-template-columns: 35px 1fr 1fr 45px 35px;';
+      colHeaders = `
+        <div>Set</div>
+        <div>Distance</div>
+        <div>Time</div>
+        <div style="text-align:center">Done</div>
+        <div></div>
+      `;
+    }
+
+    let setsHTML = `<div class="set-row set-header" style="${gridStyle}">${colHeaders}</div>`;
 
     exercise.sets.forEach((set, setIdx) => {
-      setsHTML += `
-        <div class="set-row">
-          <div style="font-weight:600; color:var(--text-dim);">${setIdx + 1}</div>
-          <input type="number" value="${set.weight}" placeholder="0" 
+      let inputsHTML = '';
+      if (type === 'weight') {
+        inputsHTML = `
+          <input type="number" value="${set.weight || ''}" placeholder="0" 
             oninput="updateSet(${exIdx}, ${setIdx}, 'weight', this.value)" />
-          <input type="number" value="${set.reps}" placeholder="0" 
+          <input type="number" value="${set.reps || ''}" placeholder="0" 
             oninput="updateSet(${exIdx}, ${setIdx}, 'reps', this.value)" />
+        `;
+      } else if (type === 'time') {
+        inputsHTML = `
+          <input type="text" value="${set.duration || ''}" placeholder="e.g. 60s or 1:30" 
+            oninput="updateSet(${exIdx}, ${setIdx}, 'duration', this.value)" />
+        `;
+      } else if (type === 'distance') {
+        inputsHTML = `
+          <input type="text" value="${set.distance || ''}" placeholder="mi / km" 
+            oninput="updateSet(${exIdx}, ${setIdx}, 'distance', this.value)" />
+          <input type="text" value="${set.duration || ''}" placeholder="min / sec" 
+            oninput="updateSet(${exIdx}, ${setIdx}, 'duration', this.value)" />
+        `;
+      }
+
+      setsHTML += `
+        <div class="set-row" style="${gridStyle}">
+          <div style="font-weight:600; color:var(--text-dim);">${setIdx + 1}</div>
+          ${inputsHTML}
           <button class="btn-check ${set.completed ? 'completed' : ''}" 
             onclick="toggleComplete(${exIdx}, ${setIdx})">✓</button>
           <button class="btn-del" onclick="removeSet(${exIdx}, ${setIdx})">×</button>
@@ -138,7 +197,15 @@ function renderWorkout() {
 
     card.innerHTML = `
       <div class="exercise-header">
-        <div class="exercise-title">${exercise.name}</div>
+        <div>
+          <div class="exercise-title">${exercise.name}</div>
+          <select style="background:#262626; color:var(--text-dim); border:1px solid var(--border); border-radius:4px; font-size:0.75rem; padding:2px 4px; margin-top:4px;"
+            onchange="changeExerciseType(${exIdx}, this.value)">
+            <option value="weight" ${type === 'weight' ? 'selected' : ''}>Weight × Reps</option>
+            <option value="time" ${type === 'time' ? 'selected' : ''}>Duration (e.g. Planks)</option>
+            <option value="distance" ${type === 'distance' ? 'selected' : ''}>Distance + Time (Cardio)</option>
+          </select>
+        </div>
         <button class="btn-small btn-secondary" onclick="removeExercise(${exIdx})">Remove</button>
       </div>
       ${setsHTML}
@@ -196,11 +263,26 @@ function renderHistory() {
 
     const card = document.createElement('div');
     card.className = 'history-card';
-    
+
     let details = item.exercises.map(ex => {
-      const totalSets = ex.sets.filter(s => s.completed).length || ex.sets.length;
-      const bestSet = ex.sets.reduce((max, s) => Number(s.weight) > Number(max.weight || 0) ? s : max, {});
-      return `<li><strong>${ex.name}</strong>: ${totalSets} sets (Top: ${bestSet.weight || 0} × ${bestSet.reps || 0})</li>`;
+      const type = ex.type || 'weight';
+      const sets = ex.sets || [];
+      const totalSets = sets.filter(s => s.completed).length || sets.length;
+
+      let summary = '';
+      if (type === 'time') {
+        const topSet = sets[0]?.duration ? `${sets[0].duration}` : 'Logged';
+        summary = `${totalSets} sets (${topSet})`;
+      } else if (type === 'distance') {
+        const d = sets[0]?.distance || '0';
+        const t = sets[0]?.duration || '0';
+        summary = `${d} in ${t}`;
+      } else {
+        const bestSet = sets.reduce((max, s) => Number(s.weight) > Number(max.weight || 0) ? s : max, {});
+        summary = `${totalSets} sets (Top: ${bestSet.weight || 0} × ${bestSet.reps || 0})`;
+      }
+
+      return `<li><strong>${ex.name}</strong>: ${summary}</li>`;
     }).join('');
 
     const syncBadge = item.synced 

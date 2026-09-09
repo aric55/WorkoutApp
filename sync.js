@@ -14,6 +14,8 @@ function getSheetUrl() {
 function updateStatusIndicator() {
   const url = getSheetUrl();
   const statusEl = document.getElementById('db-status');
+  if (!statusEl) return;
+  
   if (url) {
     statusEl.innerText = 'Sheets Connected 🟢';
     statusEl.style.color = 'var(--accent)';
@@ -32,6 +34,7 @@ function saveSettings() {
 }
 
 // Google Sheets Sync Bridge
+// Payload includes: id, date, exercises: [{ name, type, sets: [{ weight, reps, duration, distance, completed }] }]
 async function sendToSheet(entry) {
   const url = getSheetUrl();
   if (!url) return false;
@@ -70,7 +73,9 @@ async function syncAllUnsynced() {
   }
 
   saveHistory(history);
-  renderHistory();
+  if (typeof renderHistory === 'function') {
+    renderHistory();
+  }
   alert(`Sync finished! Pushed ${syncCount} workout(s) to your Sheet.`);
 }
 
@@ -97,6 +102,8 @@ function clearAllHistory() {
 
   if (confirmed) {
     localStorage.removeItem('workout_history');
-    renderHistory();
+    if (typeof renderHistory === 'function') {
+      renderHistory();
+    }
   }
 }
