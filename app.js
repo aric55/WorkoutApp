@@ -2,6 +2,7 @@
 let currentWorkout = [];
 let timerInterval = null;
 let secondsRemaining = 0;
+let currentGuideFilter = 'dayA';
 
 // 3-Day 60-Minute Workout Templates (30m Walk + 30m Free Weights)
 const TEMPLATES = {
@@ -25,6 +26,121 @@ const TEMPLATES = {
     { name: "Dumbbell Incline Bench Press", type: "weight", sets: [{ weight: "", reps: "10", completed: false }, { weight: "", reps: "10", completed: false }, { weight: "", reps: "10", completed: false }] },
     { name: "Lat Pulldown (or DB Pullover)", type: "weight", sets: [{ weight: "", reps: "10", completed: false }, { weight: "", reps: "10", completed: false }, { weight: "", reps: "10", completed: false }] },
     { name: "Side Plank", type: "time", sets: [{ duration: "30s", completed: false }, { duration: "30s", completed: false }] }
+  ]
+};
+
+// Step-by-Step Exercise Instructions
+const EXERCISE_GUIDES = {
+  dayA: [
+    {
+      name: "Treadmill Walk",
+      type: "Cardio Warmup",
+      setup: "Set treadmill incline to 2.0% - 4.0% and speed between 2.8 - 3.5 mph.",
+      execution: "Maintain an upright posture with chest up. Avoid gripping the handrails—let arms swing naturally.",
+      cues: "Breathe rhythmically. You should be warm and lightly sweating, but capable of holding a conversation."
+    },
+    {
+      name: "Goblet / Barbell Squat",
+      type: "Quadriceps & Glutes",
+      setup: "Stand with feet slightly wider than shoulder-width, toes angled outward 15-30°. Hold dumbbell vertically against your sternum (or bar across upper traps).",
+      execution: "Sit your hips back and down between your knees. Descend until thighs are at least parallel to floor while keeping knees tracking over toes.",
+      cues: "Inhale and brace abs before descending. Drive through your midfoot and heel to stand. Exhale at the top."
+    },
+    {
+      name: "Dumbbell Bench Press",
+      type: "Chest, Shoulders & Triceps",
+      setup: "Sit on bench with dumbbells resting on knees. Kick back into position with feet planted flat and shoulder blades pinched together into the bench.",
+      execution: "Lower weights under control with elbows angled ~45° away from torso (not flared wide) until dumbbells reach chest level. Press straight up over chest.",
+      cues: "Inhale on the slow descent (2 seconds); exhale forcefully as you drive weights up without banging them together."
+    },
+    {
+      name: "Dumbbell Romanian Deadlift",
+      type: "Hamstrings & Glutes",
+      setup: "Stand tall holding dumbbells in front of thighs, feet hip-width apart with a soft, slight bend in knees.",
+      execution: "Push your hips backward as if trying to touch a wall behind you. Slide dumbbells down close to shins until you feel a deep hamstring stretch.",
+      cues: "Keep spine flat and lats engaged. Do not squat down further—movement stops when hips stop travelling back. Drive hips forward to stand."
+    },
+    {
+      name: "Forearm Plank",
+      type: "Core Stability",
+      setup: "Place forearms flat on floor, elbows directly under shoulders, feet together.",
+      execution: "Lift body off floor into a rigid straight line from heels to ears. Squeeze glutes and tuck pelvis slightly.",
+      cues: "Do not let hips sag or hike into a tent. Pull belly button toward spine and breathe steadily for the full duration."
+    }
+  ],
+  dayB: [
+    {
+      name: "Treadmill Walk",
+      type: "Cardio Warmup",
+      setup: "Set incline to 2.0% - 4.0% and speed to a comfortable brisk pace (2.8 - 3.5 mph).",
+      execution: "Pump arms rhythmically; keep shoulders relaxed away from your ears.",
+      cues: "Prepares knee and hip joints for deadlifting loads."
+    },
+    {
+      name: "Deadlift (Barbell or DB)",
+      type: "Posterior Chain (Back, Glutes, Hamstrings)",
+      setup: "Feet hip-width apart. Dumbbells or bar close to shins. Hips positioned midway between knee height and shoulder height.",
+      execution: "Grip weights, brace your core, pull chest tall, and drive floor away through heels until standing upright with glutes squeezed.",
+      cues: "Inhale and brace before pull. Keep weight glued close to shins/legs throughout. Do not hyperextend or lean back at the top."
+    },
+    {
+      name: "Dumbbell Overhead Press",
+      type: "Shoulders & Triceps",
+      setup: "Stand or sit with dumbbells at shoulder height, palms facing forward or slightly inward (semi-neutral). Feet firmly rooted.",
+      execution: "Brace glutes and abs to prevent lower-back arching. Press dumbbells straight overhead until arms lock out with biceps near ears.",
+      cues: "Exhale as you press up; lower under control for 2 seconds back to ear level. Keep ribs locked down."
+    },
+    {
+      name: "Dumbbell Bent-Over Row",
+      type: "Upper Back & Lats",
+      setup: "Hinge at hips to a ~45° torso angle, spine flat, dumbbells hanging straight down from shoulders.",
+      execution: "Pull dumbbells upward toward your hip crease/waist, driving elbows back and squeezing shoulder blades together at the top.",
+      cues: "Exhale on pull. Keep neck neutral (look at floor 4 feet ahead). Avoid using momentum or standing up during reps."
+    },
+    {
+      name: "Hanging Knee Raise",
+      type: "Lower Abs & Hip Flexors",
+      setup: "Hang from pull-up bar with overhand grip (or use captain's chair forearm pads).",
+      execution: "Without swinging, roll your knees up toward your chest, curling pelvis upward slightly at the peak.",
+      cues: "Exhale as knees lift; lower slowly under control (2-3 seconds) to prevent body swing."
+    }
+  ],
+  dayC: [
+    {
+      name: "Treadmill Walk",
+      type: "Cardio Warmup",
+      setup: "Incline 2.5% - 4.0%, brisk walking pace.",
+      execution: "Focus on deep nasal breathing to elevate core body temperature.",
+      cues: "Loosens hips and ankles before single-leg lunges."
+    },
+    {
+      name: "Dumbbell Walking Lunges",
+      type: "Quads, Glutes & Balance",
+      setup: "Hold a dumbbell in each hand by sides, standing tall.",
+      execution: "Take an exaggerated step forward. Lower your back knee straight down until it hovers 1 inch above floor. Front knee remains aligned over ankle.",
+      cues: "Drive through front heel to step directly into next forward stride. Maintain an upright torso throughout."
+    },
+    {
+      name: "Dumbbell Incline Bench Press",
+      type: "Upper Chest & Shoulders",
+      setup: "Set bench to a 30° to 45° incline. Position dumbbells at chest level, feet planted firmly.",
+      execution: "Press dumbbells up and slightly inward over upper chest. Lower slowly with elbows tucked at 45°.",
+      cues: "Lower the dumbbells over 2-3 seconds. Press up forcefully without bouncing."
+    },
+    {
+      name: "Lat Pulldown (or DB Pullover)",
+      type: "Lats & Mid-Back",
+      setup: "Sit at cable machine with thighs anchored under pads. Grip bar slightly wider than shoulder width.",
+      execution: "Lean back 10-15° and pull bar down to collarbone level, driving elbows downward and back.",
+      cues: "Lead with elbows, not hands. Squeeze lats at the bottom for 1 second, then control weight up on a 3-second negative."
+    },
+    {
+      name: "Side Plank",
+      type: "Obliques & Hip Stabilizers",
+      setup: "Lie on your side propped on forearm, elbow directly under shoulder, feet stacked or staggered.",
+      execution: "Raise hips until body forms a straight diagonal line from ankles to shoulders. Hold top hip high.",
+      cues: "Keep neck neutral. Don't let top shoulder roll forward. Breathe steadily for the set duration."
+    }
   ]
 };
 
@@ -77,6 +193,10 @@ function switchTab(tab) {
   if (tab === 'workout') {
     document.getElementById('workout-view').classList.add('active');
     document.getElementById('nav-workout').classList.add('active');
+  } else if (tab === 'guide') {
+    document.getElementById('guide-view').classList.add('active');
+    document.getElementById('nav-guide').classList.add('active');
+    renderGuide(currentGuideFilter);
   } else if (tab === 'history') {
     document.getElementById('history-view').classList.add('active');
     document.getElementById('nav-history').classList.add('active');
@@ -89,6 +209,55 @@ function switchTab(tab) {
       sheetInput.value = getSheetUrl();
     }
   }
+}
+
+// Render Exercise Guide
+function renderGuide(dayKey) {
+  currentGuideFilter = dayKey;
+  const container = document.getElementById('guide-container');
+  container.innerHTML = '';
+
+  // Update chip styles
+  ['dayA', 'dayB', 'dayC'].forEach(k => {
+    const btn = document.getElementById(`filter-${k}`);
+    if (btn) {
+      if (k === dayKey) btn.classList.add('active-filter');
+      else btn.classList.remove('active-filter');
+    }
+  });
+
+  const guides = EXERCISE_GUIDES[dayKey] || [];
+
+  guides.forEach((ex, idx) => {
+    const details = document.createElement('details');
+    details.className = 'guide-accordion';
+    if (idx === 0) details.open = true; // Open first by default
+
+    details.innerHTML = `
+      <summary class="guide-summary">
+        <div>
+          <span>${ex.name}</span>
+          <span style="display:block; font-size:0.75rem; color:var(--text-dim); font-weight:400;">${ex.type}</span>
+        </div>
+      </summary>
+      <div class="guide-body">
+        <div class="guide-step">
+          <strong>1. Setup</strong>
+          <p>${ex.setup}</p>
+        </div>
+        <div class="guide-step">
+          <strong>2. Execution</strong>
+          <p>${ex.execution}</p>
+        </div>
+        <div class="guide-step">
+          <strong>3. Form Cues & Breathing</strong>
+          <p>${ex.cues}</p>
+        </div>
+      </div>
+    `;
+
+    container.appendChild(details);
+  });
 }
 
 // Workout builder

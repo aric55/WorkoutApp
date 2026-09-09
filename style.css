@@ -195,3 +195,61 @@ nav {
 }
 .sync-badge.synced { background: rgba(74, 222, 128, 0.2); color: var(--accent); }
 .sync-badge.pending { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+
+/* Guide Tab Accordion & Styles */
+.guide-accordion {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 0.75rem;
+  overflow: hidden;
+}
+
+.guide-summary {
+  padding: 0.85rem 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  background: var(--card);
+}
+
+.guide-summary::-webkit-details-marker {
+  display: none;
+}
+
+.guide-summary::after {
+  content: '▾';
+  font-size: 0.9rem;
+  color: var(--text-dim);
+  transition: transform 0.2s;
+}
+
+details[open] .guide-summary::after {
+  transform: rotate(180deg);
+}
+
+.guide-body {
+  padding: 0 1rem 1rem 1rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.guide-step {
+  margin-top: 0.6rem;
+}
+
+.guide-step strong {
+  color: var(--accent);
+  display: inline-block;
+  margin-bottom: 0.15rem;
+}
+
+.active-filter {
+  background: var(--accent) !important;
+  color: #000 !important;
+  border-color: var(--accent) !important;
+}
